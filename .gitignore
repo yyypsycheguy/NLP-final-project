@@ -1,0 +1,20 @@
+# Copilot instructions (keep private)
+.github/
+
+# Dataset cache (re-download with data_script.py)
+raw/
+data/raw/
+*.arrow
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Mac
+.DS_Store
+
+# Model checkpoints
+checkpoints/
+*.pt
+*.bin
