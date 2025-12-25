@@ -13,6 +13,7 @@ else:
     device = torch.device('cpu')
 
 
+# ================ Load model =========================
 def load_xlm_roberta_base_model(model_name="xlm-roberta-base", num_labels=3):
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -22,6 +23,15 @@ def load_xlm_roberta_base_model(model_name="xlm-roberta-base", num_labels=3):
         num_labels=num_labels,
         torch_dtype=torch.float32,  # float32 for Mac compatibility
     )
+    model = model.to(device)
+    model.print_trainable_parameters()
+
+    return model, tokenizer
+
+
+
+# ================ Load & add adapter =========================
+def adapter(model):
 
     lora_config = LoraConfig(
         task_type=TaskType.SEQ_CLS,
@@ -31,54 +41,53 @@ def load_xlm_roberta_base_model(model_name="xlm-roberta-base", num_labels=3):
         target_modules=["query", "value"] 
     )
     
-    model = get_peft_model(model, lora_config)
-    model = model.to(device)
-    model.print_trainable_parameters()
-
-    return model, tokenizer, lora_config
+    model = get_peft_model(model, lora_config) # model with adapter -> get_peft_model() freezes the base model
+    return model
 
 
-def finetune_model(model, train_dataset, val_dataset=None, task="classification"):
+
+# ================ Finetuning adapter =========================
+def finetune_model(model, train_dataset, val_dataset=None, config=None):
     """
     Fine-tune the LoRA adapter on training data.
     
     Args:
-        model: PEFT-wrapped model (already has LoRA adapters from load_xlm_roberta_base_model)
-        train_dataset: Tokenized training dataset with 'input_ids', 'attention_mask', 'labels'
+        model: PEFT-wrapped model (call adapter() first) -> passed argument should be frozen base model
+        train_dataset: Tokenized dataset with 'input_ids', 'attention_mask', 'labels'
         val_dataset: Optional validation dataset
-        task: Task type (for logging)
+        config: Dict to override default hyperparameters
     
     Returns:
         model: Fine-tuned model
     """
-    epochs = 3
-    batch_size = 16
-    learning_rate = 2e-4  # 0.0002 - good for LoRA
-    warmup_ratio = 0.1
+    default_config = {
+        'epochs': 3,
+        'batch_size': 16,
+        'learning_rate': 2e-4,
+        'warmup_ratio': 0.1,
+        'weight_decay': 0.01,
+    }
+    if config is not None:
+        default_config.update(config)
+    cfg = default_config
     
     # Calculate training steps
-    num_batches = (len(train_dataset) + batch_size - 1) // batch_size
-    total_num_training_steps = num_batches * epochs
-    num_warmup_steps = int(total_num_training_steps * warmup_ratio)
+    num_batches = (len(train_dataset) + cfg['batch_size'] - 1) // cfg['batch_size']
+    total_num_training_steps = num_batches * cfg['epochs']
+    num_warmup_steps = int(total_num_training_steps * cfg['warmup_ratio'])
 
     train_dataloader = DataLoader(
         train_dataset,
         sampler=RandomSampler(train_dataset),
-        batch_size=batch_size
+        batch_size=cfg['batch_size']
     )
-    
-    val_dataloader = None
-    if val_dataset is not None:
-        val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
 
-    # Model is already wrapped with PEFT from load_xlm_roberta_base_model
-    # No need to call get_peft_model again!
     model = model.to(device)
     
     optimizer = AdamW(
         model.parameters(),
-        lr=learning_rate,
-        weight_decay=0.01,
+        lr=cfg['learning_rate'],
+        weight_decay=cfg['weight_decay'],
     )
 
     scheduler = get_scheduler(
@@ -89,32 +98,30 @@ def finetune_model(model, train_dataset, val_dataset=None, task="classification"
     )
 
     print(f"\n{'='*50}")
-    print(f"Starting {task} fine-tuning...")
+    print(f"Starting fine-tuning...")
     print(f"  Device: {device}")
-    print(f"  Epochs: {epochs}")
-    print(f"  Batch size: {batch_size}")
+    print(f"  Epochs: {cfg['epochs']}")
+    print(f"  Batch size: {cfg['batch_size']}")
+    print(f"  Learning rate: {cfg['learning_rate']}")
     print(f"  Total steps: {total_num_training_steps}")
     print(f"  Trainable params: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
     print(f"{'='*50}\n")
 
     best_val_accuracy = 0
     
-    for epoch in range(epochs):
-        # ============ Training ============
+    for epoch in range(cfg['epochs']):
+        # training 
         model.train()
         total_loss = 0
         
-        progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch+1}/{epochs}")
+        progress_bar = tqdm(train_dataloader, desc=f"Epoch {epoch+1}/{cfg['epochs']}")
         
         for batch in progress_bar:
-            # Move batch to device
             batch = {k: v.to(device) for k, v in batch.items()}
             
-            # Forward pass
             outputs = model(**batch)
             loss = outputs.loss
             
-            # Backward pass
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -125,21 +132,9 @@ def finetune_model(model, train_dataset, val_dataset=None, task="classification"
         
         avg_train_loss = total_loss / len(train_dataloader)
         
-        # ============ Validation ============
-        if val_dataloader is not None:
-            model.eval()
-            correct = 0
-            total = 0
-            
-            with torch.no_grad():
-                for batch in val_dataloader:
-                    batch = {k: v.to(device) for k, v in batch.items()}
-                    outputs = model(**batch)
-                    predictions = torch.argmax(outputs.logits, dim=-1)
-                    correct += (predictions == batch["labels"]).sum().item()
-                    total += len(batch["labels"])
-            
-            val_accuracy = correct / total
+        # training validation 
+        if val_dataset is not None:
+            val_accuracy = evaluate(model, val_dataset, cfg['batch_size'])
             print(f"Epoch {epoch+1}: Train Loss = {avg_train_loss:.4f}, Val Accuracy = {val_accuracy:.4f}")
             
             if val_accuracy > best_val_accuracy:
@@ -149,12 +144,50 @@ def finetune_model(model, train_dataset, val_dataset=None, task="classification"
             print(f"Epoch {epoch+1}: Train Loss = {avg_train_loss:.4f}")
     
     print(f"\nTraining complete!")
-    if val_dataloader is not None:
+    if val_dataset is not None:
         print(f"Best validation accuracy: {best_val_accuracy:.4f}")
     
     return model
 
 
+
+# ================ Validation on different language =========================
+def evaluate(model, dataset, batch_size=16):
+    """
+    Evaluate model accuracy on a dataset.
+    
+    Use this for:
+    - Validation during training (English)
+    - Zero-shot evaluation on other languages
+    
+    Args:
+        model: The model to evaluate
+        dataset: Tokenized dataset with 'input_ids', 'attention_mask', 'labels'
+        batch_size: Batch size for evaluation
+    
+    Returns:
+        accuracy: Float between 0 and 1
+    """
+    model.eval()
+    dataloader = DataLoader(dataset, batch_size=batch_size)
+    
+    correct = 0
+    total = 0
+    
+    with torch.no_grad():
+        for batch in dataloader:
+            batch = {k: v.to(device) for k, v in batch.items()}
+            outputs = model(**batch)
+            predictions = torch.argmax(outputs.logits, dim=-1)
+            correct += (predictions == batch["labels"]).sum().item()
+            total += len(batch["labels"])
+    
+    accuracy = correct / total
+    return accuracy
+
+
+
+# ================ Model inference =========================
 def zero_shot_prediction(model, tokenizer, text, device="cpu"):
     """Predict class for input text."""
     model.eval()
@@ -165,12 +198,3 @@ def zero_shot_prediction(model, tokenizer, text, device="cpu"):
         prediction = torch.argmax(outputs.logits, dim=-1)
     
     return prediction.item()
-
-
-if __name__ == "__main__":
-    model, tokenizer = load_xlm_roberta_base_model()
-    
-    # Test with French text (zero-shot, model trained on English)
-    text = "Bonjour, je suis un modèle de langue."
-    pred = zero_shot_prediction(model, tokenizer, text)
-    print(f"Prediction: {pred}")

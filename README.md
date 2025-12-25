@@ -34,3 +34,20 @@ Evaluation Metrics: Accuracy per language, performance gap from English, correla
 =========================================================================
 Developer notes:
 We use Lora adapter as a similar replacement of a language adapter. By using integrated adapters in the PEFT(Parameter-Efficient Fine-Tuning) from the latest version of transformers from HuggingFace.
+
+Training pipeline:
+1. Load tokenizer (xlm-roberta-base)
+        ↓
+2. Load XNLI from data/raw/xnli
+        ↓
+3. Tokenize train + validation (English only)
+        ↓
+4. Load model + add LoRA adapter
+        ↓
+5. Fine-tune on English
+        ↓
+6. Zero-shot evaluate on: en, de, zh, ar, ru, hi
+        ↓
+7. Print results table with gap from English
+        ↓
+8. Save adapter to checkpoints/
