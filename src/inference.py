@@ -1,7 +1,3 @@
-"""
-Zero-Shot Cross-Lingual Inference
-Load a trained LoRA adapter and run predictions on any language.
-"""
 import os
 import sys
 import torch

@@ -35,6 +35,21 @@ Evaluation Metrics: Accuracy per language, performance gap from English, correla
 Developer notes:
 We use Lora adapter as a similar replacement of a language adapter. By using integrated adapters in the PEFT(Parameter-Efficient Fine-Tuning) from the latest version of transformers from HuggingFace.
 
+
+function ConnectButton(){
+    console.log("Connect pushed"); 
+    document.querySelector("#top-toolbar > colab-connect-button").shadowRoot.querySelector("#connect").click(); 
+}
+setInterval(ConnectButton, 60000);
+
+
+
+
+
+
+
+
+
 Training pipeline:
 1. Load tokenizer (xlm-roberta-base)
         ↓
@@ -51,3 +66,13 @@ Training pipeline:
 7. Print results table with gap from English
         ↓
 8. Save adapter to checkpoints/
+
+### To be ran on max locally: 
+Copy checkpoint from Google Drive to local:
+```bash
+cp -r ~/Google\ Drive/My\ Drive/nlp_project/checkpoints/xnli_lora_adapter checkpoints/
+```
+```bash
+Run inference (works fine on Mac MPS!):
+python src/inference.py --mode demo
+```

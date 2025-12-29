@@ -5,7 +5,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.xlm_roberta_base import (
     load_xlm_roberta_base_model,
-    adapter,
     finetune_model,
     evaluate
 )
@@ -64,16 +63,14 @@ def main():
         max_length=CONFIG["max_length"]
     )
     
-    # ================ Load Model + Adapter =========================
+    # ================ Load Model =========================
     print(f"\nLoading model: {CONFIG['model_name']}")
     model, _ = load_xlm_roberta_base_model(
         model_name=CONFIG["model_name"], 
         num_labels=CONFIG["num_labels"]
     )
     
-    print("Adding LoRA adapter...")
-    model = adapter(model)
-    
+
     # ================ Fine-tune on English =========================
     print("\nStarting fine-tuning (English only)...")
     model = finetune_model(

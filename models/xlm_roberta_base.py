@@ -2,7 +2,6 @@ import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, get_scheduler
 from torch.utils.data import DataLoader, RandomSampler
 from torch.optim import AdamW
-from peft import LoraConfig, get_peft_model, TaskType
 from tqdm import tqdm
 
 if torch.cuda.is_available():
@@ -21,38 +20,41 @@ def load_xlm_roberta_base_model(model_name="xlm-roberta-base", num_labels=3):
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
         num_labels=num_labels,
-        torch_dtype=torch.float32,  # float32 for Mac compatibility
+        dtype=torch.float32,  # float32 for Mac compatibility
     )
+
+    # Freeze all parameters first
+    for param in model.parameters():
+        param.requires_grad = False
+
+    # Unfreeze the classifier head
+    for param in model.classifier.parameters():
+        param.requires_grad = True
+
+    # Unfreeze the last 3 encoder layers (layers 9, 10, 11 for XLM-RoBERTa-base)
+    for layer in model.roberta.encoder.layer[-3:]:
+        for param in layer.parameters():
+            param.requires_grad = True
+
     model = model.to(device)
-    model.print_trainable_parameters()
+    
+    # Print trainable parameters info
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    total_params = sum(p.numel() for p in model.parameters())
+    print(f"Trainable parameters: {trainable_params:,} ({100 * trainable_params / total_params:.2f}%)")
+    print(f"Total parameters: {total_params:,}")
 
     return model, tokenizer
 
 
 
-# ================ Load & add adapter =========================
-def adapter(model):
-
-    lora_config = LoraConfig(
-        task_type=TaskType.SEQ_CLS,
-        r=16,  # adapter rank
-        lora_alpha=32,
-        lora_dropout=0.1,
-        target_modules=["query", "value"] 
-    )
-    
-    model = get_peft_model(model, lora_config) # model with adapter -> get_peft_model() freezes the base model
-    return model
-
-
-
-# ================ Finetuning adapter =========================
+# ================ Finetuning model =========================
 def finetune_model(model, train_dataset, val_dataset=None, config=None):
     """
-    Fine-tune the LoRA adapter on training data.
+    Fine-tune the partially unfrozen model on training data.
     
     Args:
-        model: PEFT-wrapped model (call adapter() first) -> passed argument should be frozen base model
+        model: Partially frozen model (classifier + last 3 layers unfrozen)
         train_dataset: Tokenized dataset with 'input_ids', 'attention_mask', 'labels'
         val_dataset: Optional validation dataset
         config: Dict to override default hyperparameters
@@ -63,7 +65,7 @@ def finetune_model(model, train_dataset, val_dataset=None, config=None):
     default_config = {
         'epochs': 3,
         'batch_size': 16,
-        'learning_rate': 2e-4,
+        'learning_rate': 2e-5,  # Lower LR for partial fine-tuning
         'warmup_ratio': 0.1,
         'weight_decay': 0.01,
     }
@@ -108,6 +110,8 @@ def finetune_model(model, train_dataset, val_dataset=None, config=None):
     print(f"{'='*50}\n")
 
     best_val_accuracy = 0
+    loss_history = []
+    val_acc_history = []
     
     for epoch in range(cfg['epochs']):
         # training 
@@ -131,23 +135,26 @@ def finetune_model(model, train_dataset, val_dataset=None, config=None):
             progress_bar.set_postfix({"loss": f"{loss.item():.4f}"})
         
         avg_train_loss = total_loss / len(train_dataloader)
+        loss_history.append(avg_train_loss)
         
         # training validation 
         if val_dataset is not None:
             val_accuracy = evaluate(model, val_dataset, cfg['batch_size'])
+            val_acc_history.append(val_accuracy)
             print(f"Epoch {epoch+1}: Train Loss = {avg_train_loss:.4f}, Val Accuracy = {val_accuracy:.4f}")
             
             if val_accuracy > best_val_accuracy:
                 best_val_accuracy = val_accuracy
                 print(f"  ✓ New best accuracy!")
         else:
+            val_acc_history.append(0.0)  # placeholder
             print(f"Epoch {epoch+1}: Train Loss = {avg_train_loss:.4f}")
     
     print(f"\nTraining complete!")
     if val_dataset is not None:
         print(f"Best validation accuracy: {best_val_accuracy:.4f}")
     
-    return model
+    return model, loss_history, val_acc_history
 
 
 
