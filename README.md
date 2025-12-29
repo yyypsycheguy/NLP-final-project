@@ -32,22 +32,6 @@ Apply data augmentation with back-translation
 Evaluation Metrics: Accuracy per language, performance gap from English, correlation with typological distance
 
 =========================================================================
-Developer notes:
-We use Lora adapter as a similar replacement of a language adapter. By using integrated adapters in the PEFT(Parameter-Efficient Fine-Tuning) from the latest version of transformers from HuggingFace.
-
-
-function ConnectButton(){
-    console.log("Connect pushed"); 
-    document.querySelector("#top-toolbar > colab-connect-button").shadowRoot.querySelector("#connect").click(); 
-}
-setInterval(ConnectButton, 60000);
-
-
-
-
-
-
-
 
 
 Training pipeline:
@@ -57,9 +41,9 @@ Training pipeline:
         ↓
 3. Tokenize train + validation (English only)
         ↓
-4. Load model + add LoRA adapter
+4. Load model
         ↓
-5. Fine-tune on English
+5. Partial fine-tune on English
         ↓
 6. Zero-shot evaluate on: en, de, zh, ar, ru, hi
         ↓
