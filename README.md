@@ -2,7 +2,7 @@
 
 A comprehensive NLP research project implementing zero-shot cross-lingual transfer for text classification, specifically Natural Language Inference (NLI). Train on English data only and evaluate on 5+ typologically diverse languages without any target-language training data.
 
-## 🎯 Project Overview
+## Project Overview
 
 ### Core Problem
 Most NLP resources and models are English-centric, creating a significant gap for low-resource languages. This project explores how well multilingual models can transfer knowledge from English to other languages for complex tasks like NLI.
@@ -20,7 +20,7 @@ Most NLP resources and models are English-centric, creating a significant gap fo
 - Linguistic phenomena (case systems, gender agreement, word order variations)
 - English bias mitigation in multilingual representations
 
-## 🚀 Features
+## Features
 
 - **Multilingual NLI Classification**: Entailment, Neutral, Contradiction detection
 - **Partial Fine-tuning**: Efficient training of ~7.86% of model parameters
@@ -30,7 +30,7 @@ Most NLP resources and models are English-centric, creating a significant gap fo
 - **Checkpoint Management**: Incremental training with resumable checkpoints
 - **Google Colab Integration**: Seamless cloud training with Drive storage
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 nlp_project/
@@ -58,7 +58,7 @@ nlp_project/
 └── tests/                      # Unit tests for models and pipelines
 ```
 
-## 🛠 Installation
+## Installation
 
 ### Prerequisites
 - Python 3.8+
@@ -89,7 +89,7 @@ Upload the `Train Colab Notebook.ipynb` to Google Colab and run the setup cells.
 - Google Drive mounting for checkpoint storage
 - GPU detection and device selection
 
-## 📊 Model and Dataset Details
+## Model and Dataset Details
 
 ### Model Architecture
 - **Primary Model**: XLM-RoBERTa-base (278M parameters, 100+ languages)
@@ -118,7 +118,7 @@ Upload the `Train Colab Notebook.ipynb` to Google Colab and run the setup cells.
 - Russian (ru) - Slavic, Cyrillic script
 - Hindi (hi) - Indo-Aryan, Devanagari script
 
-## 🎯 Usage
+## Usage
 
 ### Training Pipeline
 
@@ -173,7 +173,7 @@ model, loss_history, val_acc_history = finetune_model(
 )
 ```
 
-## 🌐 Gradio Web Interface
+## Gradio Web Interface
 
 ### Launching the Demo
 ```bash
@@ -197,7 +197,7 @@ The interface will be available at `http://localhost:7860`
 - **Comparison Mode**: Compare predictions across different models
 - **Export Results**: Download predictions as JSON/CSV
 
-## 🔬 Fine-tuning Pipeline Details
+## Fine-tuning Pipeline Details
 
 ### 1. Data Preparation
 - Load XNLI dataset using Hugging Face `datasets`
@@ -231,7 +231,7 @@ The interface will be available at `http://localhost:7860`
 - Error pattern identification
 - Linguistic feature correlation analysis
 
-## 📈 Expected Results
+## Expected Results
 
 ### Performance Metrics
 - **English (Training)**: ~85-90% accuracy
@@ -245,7 +245,7 @@ The interface will be available at `http://localhost:7860`
 - Partial fine-tuning maintains efficiency while preserving performance
 - Layer-wise LRs significantly improve convergence
 
-## 🧪 Testing
+## Testing
 
 Run the test suite:
 ```bash
@@ -259,7 +259,7 @@ Test categories:
 - Evaluation metrics accuracy
 - Checkpoint saving/loading
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -274,18 +274,18 @@ Test categories:
 - Use type hints for function signatures
 - Maintain backward compatibility
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **Hugging Face** for transformers and datasets libraries
 - **Facebook AI** for XLM-RoBERTa model
 - **XNLI Authors** for the multilingual NLI dataset
 - **Gradio** for the web interface framework
 
-## 📞 Contact
+## Contact
 
 For questions or collaboration opportunities:
 - Open an issue on GitHub
